@@ -142,9 +142,10 @@
     // Decode using ggwave - provide samples and byte count
     uint32_t nBytes = length * sizeof(float);
 
-    // Log audio statistics every 50 calls for more frequent debugging
+    // Log audio statistics every 50 calls for debugging
     static int callCount = 0;
-    static int lastRxDataLength = 0;
+    static bool wasReceiving = false;
+    static bool wasAnalyzing = false;
     callCount++;
 
     if (callCount % 50 == 0) {
@@ -166,6 +167,7 @@
               callCount, length, nBytes, rms, peak, isReceiving, samplesPerFrame);
     }
 
+    // Step 1: Feed audio frame to ggwave decoder
     bool decodeResult = _ggwaveInstance->decode(samples, nBytes);
 
     if (!decodeResult) {
@@ -177,58 +179,70 @@
         return nil;
     }
 
-    // Always check if any data was decoded (decode returning true just means it processed the audio)
-    int dataLength = _ggwaveInstance->rxDataLength();
+    // Track protocol marker detection
+    bool isReceiving = _ggwaveInstance->rxReceiving();
+    bool isAnalyzing = _ggwaveInstance->rxAnalyzing();
 
-    // Log when rxDataLength changes (indicates ggwave is detecting something)
-    if (dataLength != lastRxDataLength) {
-        NSLog(@"[GGWave] 🔍 rxDataLength changed: %d -> %d", lastRxDataLength, dataLength);
-        lastRxDataLength = dataLength;
+    // DETECT START MARKER (HEADER)
+    if (isReceiving && !wasReceiving) {
+        NSLog(@"[GGWave] ====== START MARKER (HEADER) DETECTED ======");
+        wasReceiving = true;
+    }
+
+    // DETECT END MARKER (FOOTER) - when analysis begins
+    if (isAnalyzing && !wasAnalyzing) {
+        NSLog(@"[GGWave] ====== END MARKER (FOOTER) DETECTED - Analysis starting ======");
+        wasAnalyzing = true;
+    }
+
+    // Step 2: Immediately check for complete message using rxTakeData()
+    // This is the CORRECT pattern used in all ggwave examples
+    uint8_t dataBuffer[256];  // kMaxDataSize from ggwave
+    GGWave::TxRxData rxData(dataBuffer, 256);
+    int dataLength = _ggwaveInstance->rxTakeData(rxData);
+
+    // Log ggwave's internal state on EVERY call when receiving (no emoji, no filtering)
+    if (isReceiving || wasReceiving) {
+        int rxDataLen = _ggwaveInstance->rxDataLength();
+        NSLog(@"[GGWave] RX_STATE isRx=%d wasRx=%d analyzing=%d wasAnalyzing=%d rxDataLen=%d takeDataResult=%d",
+              isReceiving, wasReceiving, isAnalyzing, wasAnalyzing, rxDataLen, dataLength);
     }
 
     if (dataLength > 0) {
-        // Get the decoded data first
-        const GGWave::TxRxData &rxData = _ggwaveInstance->rxData();
+        // SUCCESS - Complete message decoded!
+        NSLog(@"[GGWave] ====== DECODE COMPLETE: %d bytes received ======", dataLength);
 
-        // Log the raw data for debugging
-        NSLog(@"[GGWave] 🔍 Raw data length: %d bytes", dataLength);
-        NSLog(@"[GGWave] 🔍 rxData.size(): %d", (int)rxData.size());
-
-        // Dump first 50 bytes as hex for debugging
-        NSMutableString *hexDump = [NSMutableString string];
-        int dumpLength = MIN(50, dataLength);
-        for (int i = 0; i < dumpLength; i++) {
-            [hexDump appendFormat:@"%02x ", rxData.data()[i]];
-        }
-        NSLog(@"[GGWave] 🔍 First %d bytes (hex): %@", dumpLength, hexDump);
+        // Reset state tracking
+        wasReceiving = false;
+        wasAnalyzing = false;
 
         // Convert to NSString (data is NOT null-terminated)
         std::string cppString(reinterpret_cast<const char*>(rxData.data()), dataLength);
-        NSLog(@"[GGWave] 🔍 C++ string length: %zu", cppString.length());
-        NSLog(@"[GGWave] 🔍 C++ string: '%s'", cppString.c_str());
+        NSLog(@"[GGWave] SUCCESS: C++ string: '%s' (%zu bytes)", cppString.c_str(), cppString.length());
 
         NSString *result = [NSString stringWithUTF8String:cppString.c_str()];
 
         if (result) {
-            NSLog(@"[GGWave] ✅ ✅ ✅ Successfully decoded: '%@' (%lu chars, %d bytes)",
-                  result, (unsigned long)[result length], dataLength);
-
-            // Now consume the data to clear it (prevents infinite loop)
-            uint8_t consumeBuffer[256];  // kMaxDataSize from ggwave
-            GGWave::TxRxData consumeDst(consumeBuffer, 256);
-            int consumed = _ggwaveInstance->rxTakeData(consumeDst);
-            NSLog(@"[GGWave] Consumed %d bytes to clear buffer", consumed);
-
+            NSLog(@"[GGWave] SUCCESS: Successfully decoded: '%@' (%lu chars)",
+                  result, (unsigned long)[result length]);
             return result;
         } else {
-            NSLog(@"[GGWave] ❌ Failed to convert to NSString - string may contain non-UTF8 data");
-            NSLog(@"[GGWave] ❌ Raw C++ string was: '%s'", cppString.c_str());
-
-            // Still consume to prevent getting stuck
-            uint8_t consumeBuffer[256];
-            GGWave::TxRxData consumeDst(consumeBuffer, 256);
-            _ggwaveInstance->rxTakeData(consumeDst);
+            NSLog(@"[GGWave] ERROR: Failed to convert to NSString - string may contain non-UTF8 data");
+            NSLog(@"[GGWave] ERROR: Raw C++ string was: '%s'", cppString.c_str());
         }
+    } else if (dataLength == -1) {
+        // ERROR - Decode failed (corrupted data)
+        NSLog(@"[GGWave] ERROR: Decode FAILED - data corrupted or Reed-Solomon error");
+        wasReceiving = false;
+        wasAnalyzing = false;
+    }
+    // dataLength == 0: No data yet (still listening or receiving)
+
+    // Log when receiving ends without producing data (shouldn't happen normally)
+    if (!isReceiving && wasReceiving && dataLength == 0) {
+        NSLog(@"[GGWave] WARNING: Receiving ended but no data produced (dataLength=0)");
+        wasReceiving = false;
+        wasAnalyzing = false;
     }
 
     // No data decoded yet (normal - still accumulating audio)

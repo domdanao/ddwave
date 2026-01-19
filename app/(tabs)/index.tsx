@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, TextInput, ScrollView, Alert, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,18 +11,21 @@ export default function TransmitScreen() {
   const colorScheme = useColorScheme();
   const { isInitialized, transmit } = useGGWave({ sampleRate: 48000 });
 
-  const [text, setText] = useState('');
+  const [text, setText] = useState('Hello world');
   const [protocol, setProtocol] = useState<GGWaveProtocol>(GGWaveProtocol.AUDIBLE_FAST);
   const [volume, setVolume] = useState(50);
   const [isTransmitting, setIsTransmitting] = useState(false);
 
-  const protocols = [
-    { id: GGWaveProtocol.AUDIBLE_NORMAL, name: 'Audible Normal', description: 'Slowest, most reliable' },
-    { id: GGWaveProtocol.AUDIBLE_FAST, name: 'Audible Fast', description: 'Balanced speed and reliability' },
-    { id: GGWaveProtocol.AUDIBLE_FASTEST, name: 'Audible Fastest', description: 'Fastest, less reliable' },
-    { id: GGWaveProtocol.ULTRASOUND_NORMAL, name: 'Ultrasound Normal', description: 'Inaudible, slower' },
-    { id: GGWaveProtocol.ULTRASOUND_FAST, name: 'Ultrasound Fast', description: 'Inaudible, balanced' },
-    { id: GGWaveProtocol.ULTRASOUND_FASTEST, name: 'Ultrasound Fastest', description: 'Inaudible, fastest' },
+  const audibleProtocols = [
+    { id: GGWaveProtocol.AUDIBLE_NORMAL, name: 'Normal' },
+    { id: GGWaveProtocol.AUDIBLE_FAST, name: 'Fast' },
+    { id: GGWaveProtocol.AUDIBLE_FASTEST, name: 'Fastest' },
+  ];
+
+  const ultrasoundProtocols = [
+    { id: GGWaveProtocol.ULTRASOUND_NORMAL, name: 'Normal' },
+    { id: GGWaveProtocol.ULTRASOUND_FAST, name: 'Fast' },
+    { id: GGWaveProtocol.ULTRASOUND_FASTEST, name: 'Fastest' },
   ];
 
   const handleTransmit = async () => {
@@ -47,138 +51,176 @@ export default function TransmitScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedView style={styles.section}>
-          <ThemedText type="title" style={styles.title}>Transmit Data</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Send text via sound waves
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[colorScheme ?? 'light'].background }]} edges={['top']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ThemedView style={styles.content}>
+          <ThemedView style={styles.section}>
+            <ThemedText type="title" style={styles.title}>Transmit Data</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Send text via sound waves
+            </ThemedText>
+          </ThemedView>
 
-        <ThemedView style={styles.section}>
-          <ThemedText type="subtitle" style={styles.label}>Message</ThemedText>
-          <TextInput
+          <ThemedView style={styles.section}>
+            <ThemedText type="subtitle" style={styles.label}>Message</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                  color: colorScheme === 'dark' ? '#fff' : '#000',
+                  borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+                }
+              ]}
+              placeholder="Enter text to transmit..."
+              placeholderTextColor={colorScheme === 'dark' ? '#888' : '#999'}
+              value={text}
+              onChangeText={setText}
+              multiline
+              numberOfLines={4}
+              maxLength={140}
+            />
+            <ThemedText style={styles.charCount}>
+              {text.length}/140 characters
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.section}>
+            <ThemedText type="subtitle" style={styles.label}>Protocol</ThemedText>
+            <ThemedView style={styles.protocolColumnsContainer}>
+              {/* Left column: Audible */}
+              <ThemedView style={styles.protocolColumn}>
+                <ThemedText style={styles.protocolColumnTitle}>Audible</ThemedText>
+                {audibleProtocols.map((p) => (
+                  <ThemedView
+                    key={p.id}
+                    style={[
+                      styles.protocolButton,
+                      {
+                        backgroundColor: protocol === p.id
+                          ? Colors[colorScheme ?? 'light'].tint
+                          : (colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5'),
+                        borderColor: protocol === p.id
+                          ? Colors[colorScheme ?? 'light'].tint
+                          : (colorScheme === 'dark' ? '#444' : '#ddd'),
+                      }
+                    ]}
+                    onTouchEnd={() => setProtocol(p.id)}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.protocolName,
+                        { color: protocol === p.id ? '#fff' : (colorScheme === 'dark' ? '#FFFFFF' : '#11181C') }
+                      ]}
+                    >
+                      {p.name}
+                    </ThemedText>
+                  </ThemedView>
+                ))}
+              </ThemedView>
+
+              {/* Right column: Ultrasound */}
+              <ThemedView style={styles.protocolColumn}>
+                <ThemedText style={styles.protocolColumnTitle}>Ultrasound</ThemedText>
+                {ultrasoundProtocols.map((p) => (
+                  <ThemedView
+                    key={p.id}
+                    style={[
+                      styles.protocolButton,
+                      {
+                        backgroundColor: protocol === p.id
+                          ? Colors[colorScheme ?? 'light'].tint
+                          : (colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5'),
+                        borderColor: protocol === p.id
+                          ? Colors[colorScheme ?? 'light'].tint
+                          : (colorScheme === 'dark' ? '#444' : '#ddd'),
+                      }
+                    ]}
+                    onTouchEnd={() => setProtocol(p.id)}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.protocolName,
+                        { color: protocol === p.id ? '#fff' : (colorScheme === 'dark' ? '#FFFFFF' : '#11181C') }
+                      ]}
+                    >
+                      {p.name}
+                    </ThemedText>
+                  </ThemedView>
+                ))}
+              </ThemedView>
+            </ThemedView>
+          </ThemedView>
+
+          <ThemedView style={styles.section}>
+            <ThemedText type="subtitle" style={styles.label}>Volume: {volume}%</ThemedText>
+            <ThemedView style={styles.volumeContainer}>
+              {[25, 50, 75, 100].map((v) => (
+                <ThemedView
+                  key={v}
+                  style={[
+                    styles.volumeButton,
+                    {
+                      backgroundColor: volume === v
+                        ? Colors[colorScheme ?? 'light'].tint
+                        : (colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5'),
+                      borderColor: volume === v
+                        ? Colors[colorScheme ?? 'light'].tint
+                        : (colorScheme === 'dark' ? '#444' : '#ddd'),
+                    }
+                  ]}
+                  onTouchEnd={() => setVolume(v)}
+                >
+                  <ThemedText
+                    style={{ color: volume === v ? '#fff' : (colorScheme === 'dark' ? '#FFFFFF' : '#11181C') }}
+                  >
+                    {v}%
+                  </ThemedText>
+                </ThemedView>
+              ))}
+            </ThemedView>
+          </ThemedView>
+
+          <ThemedView
             style={[
-              styles.input,
+              styles.transmitButton,
               {
-                backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5',
-                color: colorScheme === 'dark' ? '#fff' : '#000',
-                borderColor: colorScheme === 'dark' ? '#333' : '#ddd',
+                backgroundColor: isInitialized && !isTransmitting
+                  ? Colors[colorScheme ?? 'light'].tint
+                  : '#666',
               }
             ]}
-            placeholder="Enter text to transmit..."
-            placeholderTextColor={colorScheme === 'dark' ? '#666' : '#999'}
-            value={text}
-            onChangeText={setText}
-            multiline
-            numberOfLines={4}
-            maxLength={140}
-          />
-          <ThemedText style={styles.charCount}>
-            {text.length}/140 characters
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.section}>
-          <ThemedText type="subtitle" style={styles.label}>Protocol</ThemedText>
-          <ThemedView style={styles.protocolContainer}>
-            {protocols.map((p) => (
-              <ThemedView
-                key={p.id}
-                style={[
-                  styles.protocolButton,
-                  {
-                    backgroundColor: protocol === p.id
-                      ? Colors[colorScheme ?? 'light'].tint
-                      : (colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5'),
-                    borderColor: protocol === p.id
-                      ? Colors[colorScheme ?? 'light'].tint
-                      : (colorScheme === 'dark' ? '#333' : '#ddd'),
-                  }
-                ]}
-                onTouchEnd={() => setProtocol(p.id)}
-              >
-                <ThemedText
-                  style={[
-                    styles.protocolName,
-                    { color: protocol === p.id ? '#fff' : undefined }
-                  ]}
-                >
-                  {p.name}
-                </ThemedText>
-                <ThemedText
-                  style={[
-                    styles.protocolDesc,
-                    { color: protocol === p.id ? '#fff' : '#666' }
-                  ]}
-                >
-                  {p.description}
-                </ThemedText>
-              </ThemedView>
-            ))}
+            onTouchEnd={isInitialized && !isTransmitting ? handleTransmit : undefined}
+          >
+            {isTransmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.transmitButtonText}>
+                {isInitialized ? 'Transmit' : 'Initializing...'}
+              </ThemedText>
+            )}
           </ThemedView>
         </ThemedView>
-
-        <ThemedView style={styles.section}>
-          <ThemedText type="subtitle" style={styles.label}>Volume: {volume}%</ThemedText>
-          <ThemedView style={styles.volumeContainer}>
-            {[25, 50, 75, 100].map((v) => (
-              <ThemedView
-                key={v}
-                style={[
-                  styles.volumeButton,
-                  {
-                    backgroundColor: volume === v
-                      ? Colors[colorScheme ?? 'light'].tint
-                      : (colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5'),
-                    borderColor: volume === v
-                      ? Colors[colorScheme ?? 'light'].tint
-                      : (colorScheme === 'dark' ? '#333' : '#ddd'),
-                  }
-                ]}
-                onTouchEnd={() => setVolume(v)}
-              >
-                <ThemedText
-                  style={{ color: volume === v ? '#fff' : undefined }}
-                >
-                  {v}%
-                </ThemedText>
-              </ThemedView>
-            ))}
-          </ThemedView>
-        </ThemedView>
-
-        <ThemedView
-          style={[
-            styles.transmitButton,
-            {
-              backgroundColor: isInitialized && !isTransmitting
-                ? Colors[colorScheme ?? 'light'].tint
-                : '#666',
-            }
-          ]}
-          onTouchEnd={isInitialized && !isTransmitting ? handleTransmit : undefined}
-        >
-          {isTransmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <ThemedText style={styles.transmitButtonText}>
-              {isInitialized ? 'Transmit' : 'Initializing...'}
-            </ThemedText>
-          )}
-        </ThemedView>
-      </ThemedView>
-    </ScrollView>
+        </TouchableWithoutFeedback>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
     padding: 20,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   section: {
@@ -207,21 +249,32 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     textAlign: 'right',
   },
-  protocolContainer: {
-    gap: 8,
+  protocolColumnsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  protocolColumn: {
+    width: '48%',
+    gap: 10,
+  },
+  protocolColumnTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   protocolButton: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
   },
   protocolName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  protocolDesc: {
-    fontSize: 12,
   },
   volumeContainer: {
     flexDirection: 'row',
@@ -230,8 +283,9 @@ const styles = StyleSheet.create({
   volumeButton: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
   transmitButton: {

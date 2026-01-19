@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { StyleSheet, ScrollView, FlatList, Alert } from 'react-native';
+import { StyleSheet, FlatList, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -47,165 +47,171 @@ export default function ReceiveScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedView style={styles.header}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="title">Receive Data</ThemedText>
-          <ThemedView
-            style={[
-              styles.statusIndicator,
-              { backgroundColor: isListening ? '#4CAF50' : '#666' }
-            ]}
-          />
-        </ThemedView>
-        <ThemedText style={styles.subtitle}>
-          {isListening ? 'Listening for sound waves...' : 'Tap below to start listening'}
-        </ThemedText>
-      </ThemedView>
-
-      <ThemedView style={styles.controls}>
-        <ThemedView
-          style={[
-            styles.listenButton,
-            {
-              backgroundColor: isInitialized
-                ? (isListening ? '#f44336' : Colors[colorScheme ?? 'light'].tint)
-                : '#666',
-            }
-          ]}
-          onTouchEnd={isInitialized ? handleToggleListening : undefined}
-        >
-          <ThemedText style={styles.listenButtonText}>
-            {!isInitialized
-              ? 'Initializing...'
-              : isListening
-              ? 'Stop Listening'
-              : 'Start Listening'}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+      <ThemedView style={styles.container}>
+        <ThemedView style={styles.header}>
+          <ThemedView style={styles.titleContainer}>
+            <ThemedText type="title">Receive Data</ThemedText>
+            <ThemedView
+              style={[
+                styles.statusIndicator,
+                { backgroundColor: isListening ? '#4CAF50' : '#666' }
+              ]}
+            />
+          </ThemedView>
+          <ThemedText style={styles.subtitle}>
+            {isListening ? 'Listening for sound waves...' : 'Tap below to start listening'}
           </ThemedText>
         </ThemedView>
 
-        {isListening && audioLevel && (
-          <ThemedView style={[
-            styles.audioLevelContainer,
-            {
-              backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5',
-              borderColor: colorScheme === 'dark' ? '#333' : '#ddd',
-            }
-          ]}>
-            <ThemedText style={styles.audioLevelLabel}>Audio Level</ThemedText>
-            <ThemedView style={styles.audioLevelBars}>
-              {/* RMS (average) level */}
-              <ThemedView style={styles.levelBarContainer}>
-                <ThemedText style={styles.levelLabel}>AVG</ThemedText>
-                <ThemedView style={[
-                  styles.levelBarBackground,
-                  { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' }
-                ]}>
-                  <ThemedView style={[
-                    styles.levelBarFill,
-                    {
-                      width: `${Math.min(100, (audioLevel?.rms || 0) * 1000)}%`,
-                      backgroundColor: (audioLevel?.rms || 0) > 0.01 ? '#4CAF50' : '#666',
-                    }
-                  ]} />
-                </ThemedView>
-              </ThemedView>
-              {/* Peak level */}
-              <ThemedView style={styles.levelBarContainer}>
-                <ThemedText style={styles.levelLabel}>PEAK</ThemedText>
-                <ThemedView style={[
-                  styles.levelBarBackground,
-                  { backgroundColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' }
-                ]}>
-                  <ThemedView style={[
-                    styles.levelBarFill,
-                    {
-                      width: `${Math.min(100, (audioLevel?.peak || 0) * 100)}%`,
-                      backgroundColor: (audioLevel?.peak || 0) > 0.1 ? '#FF9800' : '#666',
-                    }
-                  ]} />
-                </ThemedView>
-              </ThemedView>
-            </ThemedView>
-            <ThemedText style={styles.audioLevelHint}>
-              {(audioLevel?.rms || 0) < 0.001 ? '⚠️ No audio detected - check microphone' : '✓ Audio detected'}
-            </ThemedText>
-          </ThemedView>
-        )}
-
-        {receivedMessages.length > 0 && (
+        <ThemedView style={styles.controls}>
           <ThemedView
             style={[
-              styles.clearButton,
+              styles.listenButton,
               {
-                backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5',
-                borderColor: colorScheme === 'dark' ? '#333' : '#ddd',
+                backgroundColor: isInitialized
+                  ? (isListening ? '#f44336' : Colors[colorScheme ?? 'light'].tint)
+                  : '#666',
               }
             ]}
-            onTouchEnd={handleClearMessages}
+            onTouchEnd={isInitialized ? handleToggleListening : undefined}
           >
-            <ThemedText style={styles.clearButtonText}>
-              Clear Messages
+            <ThemedText style={styles.listenButtonText}>
+              {!isInitialized
+                ? 'Initializing...'
+                : isListening
+                ? 'Stop Listening'
+                : 'Start Listening'}
             </ThemedText>
           </ThemedView>
-        )}
-      </ThemedView>
 
-      <ThemedView style={styles.messagesContainer}>
-        <ThemedView style={styles.messagesHeader}>
-          <ThemedText type="subtitle">
-            Received Messages ({receivedMessages.length})
-          </ThemedText>
+          {isListening && audioLevel && (
+            <ThemedView style={[
+              styles.audioLevelContainer,
+              {
+                backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+              }
+            ]}>
+              <ThemedText style={styles.audioLevelLabel}>Audio Level</ThemedText>
+              <ThemedView style={styles.audioLevelBars}>
+                {/* RMS (average) level */}
+                <ThemedView style={styles.levelBarContainer}>
+                  <ThemedText style={styles.levelLabel}>AVG</ThemedText>
+                  <ThemedView style={[
+                    styles.levelBarBackground,
+                    { backgroundColor: colorScheme === 'dark' ? '#444' : '#e0e0e0' }
+                  ]}>
+                    <ThemedView style={[
+                      styles.levelBarFill,
+                      {
+                        width: `${Math.min(100, (audioLevel?.rms || 0) * 1000)}%`,
+                        backgroundColor: (audioLevel?.rms || 0) > 0.01 ? '#4CAF50' : '#666',
+                      }
+                    ]} />
+                  </ThemedView>
+                </ThemedView>
+                {/* Peak level */}
+                <ThemedView style={styles.levelBarContainer}>
+                  <ThemedText style={styles.levelLabel}>PEAK</ThemedText>
+                  <ThemedView style={[
+                    styles.levelBarBackground,
+                    { backgroundColor: colorScheme === 'dark' ? '#444' : '#e0e0e0' }
+                  ]}>
+                    <ThemedView style={[
+                      styles.levelBarFill,
+                      {
+                        width: `${Math.min(100, (audioLevel?.peak || 0) * 100)}%`,
+                        backgroundColor: (audioLevel?.peak || 0) > 0.1 ? '#FF9800' : '#666',
+                      }
+                    ]} />
+                  </ThemedView>
+                </ThemedView>
+              </ThemedView>
+              <ThemedText style={styles.audioLevelHint}>
+                {(audioLevel?.rms || 0) < 0.001 ? '⚠️ No audio detected - check microphone' : '✓ Audio detected'}
+              </ThemedText>
+            </ThemedView>
+          )}
+
+          {receivedMessages.length > 0 && (
+            <ThemedView
+              style={[
+                styles.clearButton,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                  borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+                }
+              ]}
+              onTouchEnd={handleClearMessages}
+            >
+              <ThemedText style={styles.clearButtonText}>
+                Clear Messages
+              </ThemedText>
+            </ThemedView>
+          )}
         </ThemedView>
 
-        {receivedMessages.length === 0 ? (
-          <ThemedView style={styles.emptyState}>
-            <ThemedText style={styles.emptyStateText}>
-              No messages received yet
-            </ThemedText>
-            <ThemedText style={styles.emptyStateSubtext}>
-              Start listening to receive data via sound waves
+        <ThemedView style={styles.messagesContainer}>
+          <ThemedView style={styles.messagesHeader}>
+            <ThemedText type="subtitle">
+              Received Messages ({receivedMessages.length})
             </ThemedText>
           </ThemedView>
-        ) : (
-          <FlatList
-            data={[...receivedMessages].reverse()}
-            keyExtractor={(item) => item.timestamp.toString()}
-            renderItem={({ item }) => (
-              <ThemedView
-                style={[
-                  styles.messageCard,
-                  {
-                    backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5',
-                    borderColor: colorScheme === 'dark' ? '#333' : '#ddd',
-                  }
-                ]}
-              >
-                <ThemedView style={styles.messageHeader}>
-                  <ThemedText style={styles.messageTime}>
-                    {formatTimestamp(item.timestamp)}
+
+          {receivedMessages.length === 0 ? (
+            <ThemedView style={styles.emptyState}>
+              <ThemedText style={styles.emptyStateText}>
+                No messages received yet
+              </ThemedText>
+              <ThemedText style={styles.emptyStateSubtext}>
+                Start listening to receive data via sound waves
+              </ThemedText>
+            </ThemedView>
+          ) : (
+            <FlatList
+              data={[...receivedMessages].reverse()}
+              keyExtractor={(item) => item.timestamp.toString()}
+              renderItem={({ item }) => (
+                <ThemedView
+                  style={[
+                    styles.messageCard,
+                    {
+                      backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                      borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+                    }
+                  ]}
+                >
+                  <ThemedView style={styles.messageHeader}>
+                    <ThemedText style={styles.messageTime}>
+                      {formatTimestamp(item.timestamp)}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedText style={styles.messageText}>
+                    {item.text}
                   </ThemedText>
                 </ThemedView>
-                <ThemedText style={styles.messageText}>
-                  {item.text}
-                </ThemedText>
-              </ThemedView>
-            )}
-            contentContainerStyle={styles.messagesList}
-            showsVerticalScrollIndicator={true}
-          />
-        )}
+              )}
+              contentContainerStyle={styles.messagesList}
+              showsVerticalScrollIndicator={true}
+            />
+          )}
+        </ThemedView>
       </ThemedView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
   header: {
     padding: 20,
+    paddingTop: 8,
     paddingBottom: 16,
   },
   titleContainer: {

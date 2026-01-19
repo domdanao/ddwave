@@ -1,7 +1,9 @@
 import ExpoModulesCore
 import AVFoundation
+import os.log
 
 public class ExpoGGWaveModule: Module {
+    private let logger = Logger(subsystem: "com.ddwave.ggwave", category: "ExpoGGWaveModule")
     private var ggwaveEngine: GGWaveEngine?
     private var audioManager: AudioManager?
     private var audioCallbackCount = 0
@@ -11,12 +13,12 @@ public class ExpoGGWaveModule: Module {
 
         // Initialize the ggwave engine
         Function("initialize") { (sampleRate: Int) in
-            NSLog("[ExpoGGWaveModule] initialize called with sampleRate: \(sampleRate)")
+            logger.info("[ExpoGGWaveModule] initialize called with sampleRate: \(sampleRate)")
             self.ggwaveEngine = GGWaveEngine(sampleRate: Int32(sampleRate))
-            NSLog("[ExpoGGWaveModule] GGWaveEngine created")
+            logger.info("[ExpoGGWaveModule] GGWaveEngine created")
             self.audioManager = AudioManager()
-            NSLog("[ExpoGGWaveModule] AudioManager created")
-            NSLog("[ExpoGGWaveModule] Initialized successfully")
+            logger.info("[ExpoGGWaveModule] AudioManager created")
+            logger.info("[ExpoGGWaveModule] Initialized successfully")
         }
 
         // Encode text to audio waveform
@@ -38,39 +40,41 @@ public class ExpoGGWaveModule: Module {
         // Play waveform through speaker
         AsyncFunction("playWaveform") { (samples: [Float], sampleRate: Int) -> Void in
             guard let manager = self.audioManager else {
-                print("[ExpoGGWaveModule] ERROR: AudioManager not initialized")
+                logger.error("[ExpoGGWaveModule] ERROR: AudioManager not initialized")
                 throw NSError(domain: "ExpoGGWaveModule", code: 3,
                             userInfo: [NSLocalizedDescriptionKey: "AudioManager not initialized"])
             }
 
-            print("[ExpoGGWaveModule] Received \(samples.count) samples for playback")
+            logger.info("[ExpoGGWaveModule] Received \(samples.count) samples for playback")
 
             do {
                 try manager.playWaveform(samples, sampleRate: sampleRate)
-                print("[ExpoGGWaveModule] Playback completed successfully")
+                logger.info("[ExpoGGWaveModule] Playback completed successfully")
             } catch {
-                print("[ExpoGGWaveModule] ERROR during playback: \(error.localizedDescription)")
+                logger.error("[ExpoGGWaveModule] ERROR during playback: \(error.localizedDescription)")
                 throw error
             }
         }
 
         // Start listening for data
         AsyncFunction("startListening") {
-            NSLog("[ExpoGGWaveModule] startListening called")
+            logger.info("=========================================")
+            logger.info("[ExpoGGWaveModule] startListening called")
+            logger.info("=========================================")
 
             guard let manager = self.audioManager else {
-                NSLog("[ExpoGGWaveModule] ERROR: AudioManager not initialized")
+                logger.error("[ExpoGGWaveModule] ERROR: AudioManager not initialized")
                 throw NSError(domain: "ExpoGGWaveModule", code: 4,
                             userInfo: [NSLocalizedDescriptionKey: "AudioManager not initialized"])
             }
 
             guard let engine = self.ggwaveEngine else {
-                NSLog("[ExpoGGWaveModule] ERROR: GGWave engine not initialized")
+                logger.error("[ExpoGGWaveModule] ERROR: GGWave engine not initialized")
                 throw NSError(domain: "ExpoGGWaveModule", code: 5,
                             userInfo: [NSLocalizedDescriptionKey: "GGWave not initialized"])
             }
 
-            NSLog("[ExpoGGWaveModule] About to call manager.startRecording...")
+            logger.info("[ExpoGGWaveModule] About to call manager.startRecording...")
             self.audioCallbackCount = 0
 
             try await manager.startRecording { [weak self] samples in
@@ -80,7 +84,7 @@ public class ExpoGGWaveModule: Module {
 
                 // Log first few callbacks to verify audio is flowing
                 if self.audioCallbackCount <= 5 {
-                    NSLog("[ExpoGGWaveModule] Audio callback #\(self.audioCallbackCount): received \(samples.count) samples")
+                    self.logger.info("[ExpoGGWaveModule] Audio callback #\(self.audioCallbackCount): received \(samples.count) samples")
                 }
 
                 // Calculate and send audio levels every 10 callbacks for visual feedback
@@ -99,17 +103,17 @@ public class ExpoGGWaveModule: Module {
                 samples.withUnsafeBufferPointer { bufferPointer in
                     if let baseAddress = bufferPointer.baseAddress {
                         if let decoded = engine.decodeAudio(baseAddress, length: Int32(samples.count)) {
-                            NSLog("[ExpoGGWaveModule] 🎉 🎉 🎉 DECODED MESSAGE: '\(decoded)'")
+                            self.logger.info("[ExpoGGWaveModule] 🎉 🎉 🎉 DECODED MESSAGE: '\(decoded)'")
                             // Send event to JavaScript
                             self.sendEvent("onDataReceived", [
                                 "text": decoded
                             ])
-                            NSLog("[ExpoGGWaveModule] ✅ Event sent to JavaScript: onDataReceived with text=\(decoded)")
+                            self.logger.info("[ExpoGGWaveModule] ✅ Event sent to JavaScript: onDataReceived with text=\(decoded)")
                         }
                     }
                 }
             }
-            NSLog("[ExpoGGWaveModule] manager.startRecording returned successfully")
+            logger.info("[ExpoGGWaveModule] manager.startRecording returned successfully")
         }
 
         // Stop listening
@@ -141,14 +145,14 @@ public class ExpoGGWaveModule: Module {
 
         // Module lifecycle
         OnCreate {
-            print("[ExpoGGWaveModule] Module created")
+            logger.info("[ExpoGGWaveModule] Module created")
         }
 
         OnDestroy {
             self.audioManager?.stopRecording()
             self.audioManager = nil
             self.ggwaveEngine = nil
-            print("[ExpoGGWaveModule] Module destroyed")
+            logger.info("[ExpoGGWaveModule] Module destroyed")
         }
     }
 }
