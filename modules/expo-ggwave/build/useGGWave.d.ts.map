@@ -1,0 +1,1 @@
+{"version":3,"file":"useGGWave.d.ts","sourceRoot":"","sources":["../src/useGGWave.ts"],"names":[],"mappings":"AACA,OAAe,EAAE,cAAc,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAY/D,MAAM,WAAW,eAAe;IAC9B,IAAI,EAAE,MAAM,CAAC;IACb,SAAS,EAAE,MAAM,CAAC;CACnB;AAED,UAAU,eAAgB,SAAQ,YAAY;CAE7C;AAED,wBAAgB,SAAS,CAAC,MAAM,CAAC,EAAE,eAAe;;;;;;;;qBAaxC,MAAM,aACD,cAAc,WAChB,MAAM;;;;EAgDlB"}

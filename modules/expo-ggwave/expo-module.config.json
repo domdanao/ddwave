@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["ExpoGGWaveModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.ggwave.ExpoGGWaveModule"]
+  }
+}

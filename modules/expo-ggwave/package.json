@@ -1,0 +1,43 @@
+{
+  "name": "expo-ggwave",
+  "version": "1.0.0",
+  "description": "Native module for ggwave data-over-sound transmission",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "lint": "expo-module lint",
+    "test": "expo-module test",
+    "prepare": "expo-module prepare",
+    "prepublishOnly": "expo-module prepublishOnly",
+    "expo-module": "expo-module"
+  },
+  "keywords": [
+    "expo",
+    "ggwave",
+    "audio",
+    "data-over-sound",
+    "ultrasound",
+    "react-native"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ddwave.git",
+    "directory": "modules/expo-ggwave"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/ddwave/issues"
+  },
+  "author": "Your Name <your.email@example.com> (https://github.com/yourusername)",
+  "license": "MIT",
+  "homepage": "https://github.com/yourusername/ddwave/tree/main/modules/expo-ggwave#readme",
+  "devDependencies": {
+    "expo-module-scripts": "^3.0.0"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}
