@@ -22,7 +22,13 @@ export interface GGWaveAudioLevelEvent {
   peak: number; // Peak volume
 }
 
+export interface GGWaveDecodeEvent {
+  type: 'start_marker' | 'end_marker' | 'decode_success' | 'decode_failed';
+  message?: string;
+}
+
 export interface ExpoGGWaveModuleEvents {
   onDataReceived(event: GGWaveDataReceivedEvent): void;
   onAudioLevel(event: GGWaveAudioLevelEvent): void;
+  onDecodeEvent(event: GGWaveDecodeEvent): void;
 }

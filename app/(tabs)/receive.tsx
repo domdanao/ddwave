@@ -1,10 +1,13 @@
-import { StyleSheet, FlatList, Alert } from 'react-native';
+import { StyleSheet, FlatList, Alert, TouchableOpacity, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useGGWave } from '@ddwave/expo-ggwave';
+import { requireNativeModule } from 'expo-modules-core';
+
+const ExpoGGWaveModule = requireNativeModule('ExpoGGWave');
 
 export default function ReceiveScreen() {
   const colorScheme = useColorScheme();
@@ -19,13 +22,18 @@ export default function ReceiveScreen() {
   } = useGGWave({ sampleRate: 48000 });
 
   const handleToggleListening = async () => {
+    console.log('🔴 [RX] Button pressed! isListening:', isListening, 'isInitialized:', isInitialized);
     try {
       if (isListening) {
+        console.log('🔴 [RX] Calling stopListening...');
         await stopListening();
       } else {
+        console.log('🔴 [RX] Calling startListening...');
         await startListening();
+        console.log('🔴 [RX] startListening returned');
       }
     } catch (error) {
+      console.error('🔴 [RX] ERROR:', error);
       Alert.alert('Error', `Failed to ${isListening ? 'stop' : 'start'} listening: ${error}`);
     }
   };
@@ -39,6 +47,54 @@ export default function ReceiveScreen() {
         { text: 'Clear', style: 'destructive', onPress: clearMessages },
       ]
     );
+  };
+
+  const handleSaveAudio = async () => {
+    try {
+      console.log('💾 [RX] Saving recorded audio...');
+      const filePath = await ExpoGGWaveModule.saveRecordedAudio();
+      if (filePath) {
+        console.log('💾 [RX] Audio saved to:', filePath);
+        Alert.alert(
+          'Audio Saved',
+          `Recorded audio saved to:\n${filePath}\n\nOpen Files app to access it.`,
+          [
+            { text: 'OK' },
+            {
+              text: 'Share',
+              onPress: async () => {
+                try {
+                  await Share.share({ url: `file://${filePath}` });
+                } catch (error) {
+                  console.error('Share error:', error);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'No recorded audio to save');
+      }
+    } catch (error) {
+      console.error('💾 [RX] Save error:', error);
+      Alert.alert('Error', `Failed to save audio: ${error}`);
+    }
+  };
+
+  const handlePlayAudio = async () => {
+    if (isListening) {
+      Alert.alert('Cannot Play', 'Stop listening before playing recorded audio');
+      return;
+    }
+
+    try {
+      console.log('▶️ [RX] Playing recorded audio...');
+      await ExpoGGWaveModule.playRecordedAudio();
+      console.log('▶️ [RX] Playback started');
+    } catch (error) {
+      console.error('▶️ [RX] Playback error:', error);
+      Alert.alert('Error', `Failed to play audio: ${error}`);
+    }
   };
 
   const formatTimestamp = (timestamp: number) => {
@@ -65,7 +121,7 @@ export default function ReceiveScreen() {
         </ThemedView>
 
         <ThemedView style={styles.controls}>
-          <ThemedView
+          <TouchableOpacity
             style={[
               styles.listenButton,
               {
@@ -74,7 +130,9 @@ export default function ReceiveScreen() {
                   : '#666',
               }
             ]}
-            onTouchEnd={isInitialized ? handleToggleListening : undefined}
+            onPress={isInitialized ? handleToggleListening : undefined}
+            disabled={!isInitialized}
+            activeOpacity={0.7}
           >
             <ThemedText style={styles.listenButtonText}>
               {!isInitialized
@@ -83,7 +141,7 @@ export default function ReceiveScreen() {
                 ? 'Stop Listening'
                 : 'Start Listening'}
             </ThemedText>
-          </ThemedView>
+          </TouchableOpacity>
 
           {isListening && audioLevel && (
             <ThemedView style={[
@@ -134,8 +192,44 @@ export default function ReceiveScreen() {
             </ThemedView>
           )}
 
+          <ThemedView style={styles.audioButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.audioButton,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                  borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+                  opacity: isListening ? 0.5 : 1,
+                }
+              ]}
+              onPress={handlePlayAudio}
+              disabled={isListening}
+              activeOpacity={0.7}
+            >
+              <ThemedText style={styles.audioButtonText}>
+                ▶️ Play
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.audioButton,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#f5f5f5',
+                  borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
+                }
+              ]}
+              onPress={handleSaveAudio}
+              activeOpacity={0.7}
+            >
+              <ThemedText style={styles.audioButtonText}>
+                💾 Save
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+
           {receivedMessages.length > 0 && (
-            <ThemedView
+            <TouchableOpacity
               style={[
                 styles.clearButton,
                 {
@@ -143,12 +237,13 @@ export default function ReceiveScreen() {
                   borderColor: colorScheme === 'dark' ? '#444' : '#ddd',
                 }
               ]}
-              onTouchEnd={handleClearMessages}
+              onPress={handleClearMessages}
+              activeOpacity={0.7}
             >
               <ThemedText style={styles.clearButtonText}>
                 Clear Messages
               </ThemedText>
-            </ThemedView>
+            </TouchableOpacity>
           )}
         </ThemedView>
 
@@ -243,6 +338,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  saveButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   clearButton: {
     borderWidth: 1,
     borderRadius: 12,
@@ -250,6 +355,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  audioButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  audioButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  audioButtonText: {
     fontSize: 16,
     fontWeight: '500',
   },

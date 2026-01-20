@@ -11,6 +11,8 @@ NS_ASSUME_NONNULL_BEGIN
                                         error:(NSError * _Nullable * _Nullable)error;
 - (nullable NSString *)decodeAudio:(const float *)samples
                             length:(int)length;
+- (BOOL)isRxReceiving;
+- (BOOL)isRxAnalyzing;
 - (NSArray<NSNumber *> *)availableProtocols;
 
 @end

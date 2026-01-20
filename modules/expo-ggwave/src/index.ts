@@ -54,7 +54,8 @@ class GGWave {
     const subscription = emitter.addListener(
       'onDataReceived',
       (event) => {
-        console.log('[GGWave JS] Received event:', event);
+        console.log('🎉🎉🎉 [GGWave JS] DECODED DATA RECEIVED:', event);
+        console.log('🎉🎉🎉 [GGWave JS] Message text:', event.text);
         callback(event.text);
       }
     );
@@ -62,6 +63,7 @@ class GGWave {
     console.log('[GGWave JS] Calling native startListening...');
     await ExpoGGWaveModule.startListening();
     console.log('[GGWave JS] Native startListening completed');
+    console.log('[GGWave JS] ✓ Listening for transmissions...');
 
     return subscription;
   }
@@ -72,5 +74,5 @@ class GGWave {
 }
 
 export default new GGWave();
-export { GGWaveProtocol, GGWaveConfig, GGWaveDataReceivedEvent };
+export { GGWaveProtocol, GGWaveConfig, GGWaveDataReceivedEvent, GGWaveDecodeEvent } from './ExpoGGWave.types';
 export * from './useGGWave';

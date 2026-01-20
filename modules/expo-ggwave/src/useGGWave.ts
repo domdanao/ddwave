@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import GGWave, { GGWaveProtocol, GGWaveConfig } from './index';
 import { requireNativeModule, EventEmitter } from 'expo-modules-core';
-import { GGWaveAudioLevelEvent, GGWaveDataReceivedEvent } from './ExpoGGWave.types';
+import { GGWaveAudioLevelEvent, GGWaveDataReceivedEvent, GGWaveDecodeEvent } from './ExpoGGWave.types';
 
 type GGWaveEventMap = {
   onDataReceived: (event: GGWaveDataReceivedEvent) => void;
   onAudioLevel: (event: GGWaveAudioLevelEvent) => void;
+  onDecodeEvent: (event: GGWaveDecodeEvent) => void;
 };
 
 const ExpoGGWaveModule = requireNativeModule('ExpoGGWave');
@@ -27,6 +28,7 @@ export function useGGWave(config?: UseGGWaveConfig) {
   const [audioLevel, setAudioLevel] = useState({ rms: 0, peak: 0 });
   const [subscription, setSubscription] = useState<{ remove: () => void } | null>(null);
   const [audioLevelSubscription, setAudioLevelSubscription] = useState<{ remove: () => void } | null>(null);
+  const [decodeEventSubscription, setDecodeEventSubscription] = useState<{ remove: () => void } | null>(null);
 
   useEffect(() => {
     GGWave.initialize(config).then(() => setIsInitialized(true));
@@ -52,6 +54,12 @@ export function useGGWave(config?: UseGGWaveConfig) {
     });
     setAudioLevelSubscription(audioSub);
 
+    // Subscribe to decode diagnostic events
+    const decodeSub = emitter.addListener('onDecodeEvent', (event: GGWaveDecodeEvent) => {
+      console.log(`📡 [GGWave DECODE] ${event.type}:`, event.message || '');
+    });
+    setDecodeEventSubscription(decodeSub);
+
     setIsListening(true);
   }, []);
 
@@ -64,10 +72,14 @@ export function useGGWave(config?: UseGGWaveConfig) {
       audioLevelSubscription.remove();
       setAudioLevelSubscription(null);
     }
+    if (decodeEventSubscription) {
+      decodeEventSubscription.remove();
+      setDecodeEventSubscription(null);
+    }
     await GGWave.stopListening();
     setIsListening(false);
     setAudioLevel({ rms: 0, peak: 0 });
-  }, [subscription, audioLevelSubscription]);
+  }, [subscription, audioLevelSubscription, decodeEventSubscription]);
 
   const clearMessages = useCallback(() => {
     setReceivedMessages([]);

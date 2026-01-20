@@ -16,15 +16,22 @@
 
         // Get default parameters and configure
         GGWave::Parameters params = GGWave::getDefaultParameters();
-        params.sampleRateInp = sampleRate;
-        params.sampleRateOut = sampleRate;
-        params.sampleRate = sampleRate;
+
+        // CRITICAL: Set sampleRateInp to the device sample rate
+        // ggwave will internally resample from device rate to its internal 48kHz
+        // This matches the working ggwave-objc implementation pattern
+        params.sampleRateInp = sampleRate;  // Device sample rate (44.1kHz or 48kHz)
+        params.sampleRateOut = sampleRate;  // Output at same rate for playback
+        // params.sampleRate is the INTERNAL rate (defaults to 48kHz) - don't override it!
+
         params.sampleFormatInp = GGWAVE_SAMPLE_FORMAT_F32;  // Input audio is Float32
         params.sampleFormatOut = GGWAVE_SAMPLE_FORMAT_F32;  // Output audio is Float32
         params.operatingMode = GGWAVE_OPERATING_MODE_RX_AND_TX;
 
         NSLog(@"[GGWave] Creating ggwave instance with:");
-        NSLog(@"[GGWave]   - sampleRate: %d Hz", sampleRate);
+        NSLog(@"[GGWave]   - sampleRateInp: %d Hz (device rate - will be resampled internally)", sampleRate);
+        NSLog(@"[GGWave]   - sampleRateOut: %d Hz", sampleRate);
+        NSLog(@"[GGWave]   - internal sampleRate: %.0f Hz (ggwave default)", params.sampleRate);
         NSLog(@"[GGWave]   - sampleFormatInp: F32");
         NSLog(@"[GGWave]   - sampleFormatOut: F32");
         NSLog(@"[GGWave]   - operatingMode: RX_AND_TX");
@@ -38,7 +45,7 @@
 
         NSLog(@"[GGWave] ✅ Initialized for RX and TX");
         NSLog(@"[GGWave]   samplesPerFrame: %d", samplesPerFrame);
-        NSLog(@"[GGWave]   Note: rxReceiving starts at 0 and becomes 1 when actively decoding");
+        NSLog(@"[GGWave]   Resampling enabled: device %d Hz -> internal 48kHz", sampleRate);
     }
     return self;
 }
@@ -142,30 +149,11 @@
     // Decode using ggwave - provide samples and byte count
     uint32_t nBytes = length * sizeof(float);
 
-    // Log audio statistics every 50 calls for debugging
+    // Track decode calls
     static int callCount = 0;
     static bool wasReceiving = false;
     static bool wasAnalyzing = false;
     callCount++;
-
-    if (callCount % 50 == 0) {
-        // Calculate RMS to see if we're getting valid audio
-        float rms = 0;
-        float peak = 0;
-        for (int i = 0; i < length; i++) {
-            float sample = samples[i];
-            rms += sample * sample;
-            if (fabs(sample) > peak) peak = fabs(sample);
-        }
-        rms = sqrt(rms / length);
-
-        // Check ggwave's receiving state
-        bool isReceiving = _ggwaveInstance->rxReceiving();
-        int samplesPerFrame = _ggwaveInstance->samplesPerFrame();
-
-        NSLog(@"[GGWave] decode #%d - samples:%d bytes:%u RMS:%.6f Peak:%.6f isRx:%d SPF:%d",
-              callCount, length, nBytes, rms, peak, isReceiving, samplesPerFrame);
-    }
 
     // Step 1: Feed audio frame to ggwave decoder
     bool decodeResult = _ggwaveInstance->decode(samples, nBytes);
@@ -183,15 +171,52 @@
     bool isReceiving = _ggwaveInstance->rxReceiving();
     bool isAnalyzing = _ggwaveInstance->rxAnalyzing();
 
+    // DIAGNOSTIC: Log state every 50 calls to see if we're EVER getting markers
+    if (callCount % 50 == 0) {
+        // Calculate RMS and find peak to verify we're getting real audio
+        float rms = 0;
+        float peak = 0;
+        float minVal = 1.0f;
+        float maxVal = -1.0f;
+        for (int i = 0; i < length; i++) {
+            float sample = samples[i];
+            rms += sample * sample;
+            float absSample = fabs(sample);
+            if (absSample > peak) peak = absSample;
+            if (sample < minVal) minVal = sample;
+            if (sample > maxVal) maxVal = sample;
+        }
+        rms = sqrt(rms / length);
+
+        NSLog(@"[GGWave] 🔍 DECODE STATUS #%d: decode=%s, rxReceiving=%s, rxAnalyzing=%s",
+              callCount,
+              decodeResult ? "OK" : "FAIL",
+              isReceiving ? "YES" : "no",
+              isAnalyzing ? "YES" : "no");
+        NSLog(@"[GGWave]     samples=%d, rms=%.6f, peak=%.6f, range=[%.6f, %.6f]",
+              length, rms, peak, minVal, maxVal);
+
+        // Log first few samples to verify data integrity
+        NSLog(@"[GGWave]     first 10 samples: %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f",
+              samples[0], samples[1], samples[2], samples[3], samples[4],
+              samples[5], samples[6], samples[7], samples[8], samples[9]);
+    }
+
     // DETECT START MARKER (HEADER)
     if (isReceiving && !wasReceiving) {
-        NSLog(@"[GGWave] ====== START MARKER (HEADER) DETECTED ======");
+        NSLog(@"[GGWave] ══════════════════════════════════════════");
+        NSLog(@"[GGWave] 📡 START MARKER DETECTED - Receiving data...");
+        NSLog(@"[GGWave] ══════════════════════════════════════════");
+        printf("[GGWave] 📡 START MARKER DETECTED\n");  // Also print to stdout
+        fflush(stdout);
         wasReceiving = true;
     }
 
     // DETECT END MARKER (FOOTER) - when analysis begins
     if (isAnalyzing && !wasAnalyzing) {
-        NSLog(@"[GGWave] ====== END MARKER (FOOTER) DETECTED - Analysis starting ======");
+        NSLog(@"[GGWave] 🔍 END MARKER DETECTED - Analyzing data...");
+        printf("[GGWave] 🔍 END MARKER DETECTED\n");
+        fflush(stdout);
         wasAnalyzing = true;
     }
 
@@ -201,16 +226,13 @@
     GGWave::TxRxData rxData(dataBuffer, 256);
     int dataLength = _ggwaveInstance->rxTakeData(rxData);
 
-    // Log ggwave's internal state on EVERY call when receiving (no emoji, no filtering)
-    if (isReceiving || wasReceiving) {
-        int rxDataLen = _ggwaveInstance->rxDataLength();
-        NSLog(@"[GGWave] RX_STATE isRx=%d wasRx=%d analyzing=%d wasAnalyzing=%d rxDataLen=%d takeDataResult=%d",
-              isReceiving, wasReceiving, isAnalyzing, wasAnalyzing, rxDataLen, dataLength);
-    }
-
     if (dataLength > 0) {
         // SUCCESS - Complete message decoded!
-        NSLog(@"[GGWave] ====== DECODE COMPLETE: %d bytes received ======", dataLength);
+        NSLog(@"[GGWave] ══════════════════════════════════════════");
+        NSLog(@"[GGWave] ✅ DECODE SUCCESS: %d bytes received", dataLength);
+        NSLog(@"[GGWave] ══════════════════════════════════════════");
+        printf("[GGWave] ✅ DECODE SUCCESS\n");  // Also print to stdout
+        fflush(stdout);
 
         // Reset state tracking
         wasReceiving = false;
@@ -218,35 +240,46 @@
 
         // Convert to NSString (data is NOT null-terminated)
         std::string cppString(reinterpret_cast<const char*>(rxData.data()), dataLength);
-        NSLog(@"[GGWave] SUCCESS: C++ string: '%s' (%zu bytes)", cppString.c_str(), cppString.length());
-
         NSString *result = [NSString stringWithUTF8String:cppString.c_str()];
 
         if (result) {
-            NSLog(@"[GGWave] SUCCESS: Successfully decoded: '%@' (%lu chars)",
-                  result, (unsigned long)[result length]);
             return result;
         } else {
-            NSLog(@"[GGWave] ERROR: Failed to convert to NSString - string may contain non-UTF8 data");
-            NSLog(@"[GGWave] ERROR: Raw C++ string was: '%s'", cppString.c_str());
+            NSLog(@"[GGWave] ❌ ERROR: Failed to convert to NSString");
         }
     } else if (dataLength == -1) {
         // ERROR - Decode failed (corrupted data)
-        NSLog(@"[GGWave] ERROR: Decode FAILED - data corrupted or Reed-Solomon error");
+        NSLog(@"[GGWave] ❌ Decode FAILED - data corrupted or Reed-Solomon error");
+        printf("[GGWave] ❌ DECODE FAILED\n");
+        fflush(stdout);
         wasReceiving = false;
         wasAnalyzing = false;
     }
     // dataLength == 0: No data yet (still listening or receiving)
 
-    // Log when receiving ends without producing data (shouldn't happen normally)
+    // Log when receiving ends without producing data
     if (!isReceiving && wasReceiving && dataLength == 0) {
-        NSLog(@"[GGWave] WARNING: Receiving ended but no data produced (dataLength=0)");
+        NSLog(@"[GGWave] ⚠️ Receiving ended but no data produced");
         wasReceiving = false;
         wasAnalyzing = false;
     }
 
     // No data decoded yet (normal - still accumulating audio)
     return nil;
+}
+
+- (BOOL)isRxReceiving {
+    if (!_ggwaveInstance) {
+        return NO;
+    }
+    return _ggwaveInstance->rxReceiving();
+}
+
+- (BOOL)isRxAnalyzing {
+    if (!_ggwaveInstance) {
+        return NO;
+    }
+    return _ggwaveInstance->rxAnalyzing();
 }
 
 - (NSArray<NSNumber *> *)availableProtocols {
